@@ -20,6 +20,7 @@ options:
   --screenloglevel=<>       log level on screen
   --episodes=<>             number of episodes to play
   --stack=<>                starting stack for each player [default: 500].
+  --silent                  Run in silent mode with minimal logging
 
 """
 
@@ -48,12 +49,26 @@ def command_line_parser():
         logfile = "default"
     model_name = args["--name"] if args["--name"] else "dqn1"
     screenloglevel = (
-        logging.INFO
-        if not args["--screenloglevel"]
-        else getattr(logging, args["--screenloglevel"].upper())
+        logging.CRITICAL  # Use CRITICAL for silent mode
+        if args["--silent"]
+        else (
+            logging.INFO
+            if not args["--screenloglevel"]
+            else getattr(logging, args["--screenloglevel"].upper())
+        )
     )
     _ = get_config()
     init_logger(screenlevel=screenloglevel, filename=logfile)
+    
+    # For DQN training, suppress noisy loggers but keep important ones
+    if args.get("dqn_train"):
+        # Suppress gym environment logs but keep agent logs
+        logging.getLogger("gym_env.env").setLevel(logging.WARNING)
+        logging.getLogger("gym_env.cycle").setLevel(logging.WARNING)
+        logging.getLogger("agents").setLevel(logging.INFO)
+        # Suppress gymnasium warnings
+        logging.getLogger("gymnasium").setLevel(logging.ERROR)
+        
     print(f"Screenloglevel: {screenloglevel}")
     log = logging.getLogger("")
     log.info("Initializing program")
@@ -82,10 +97,13 @@ def command_line_parser():
             runner.equity_self_improvement(improvement_rounds)
 
         elif args["dqn_train"]:
-            runner.dqn_train_keras_rl(model_name)
+            # For training, use WARNING level to reduce environment noise but keep important info
+            if not args["--screenloglevel"]:
+                screenloglevel = logging.WARNING
+            runner.dqn_train(model_name)
 
         elif args["dqn_play"]:
-            runner.dqn_play_keras_rl(model_name)
+            runner.dqn_play(model_name)
 
     else:
         raise RuntimeError("Argument not yet implemented")
@@ -201,10 +219,10 @@ class SelfPlay:
                 betting[i] = np.mean([betting[i], betting[best_player]])
                 self.log.info(f"New betting for player {i} is {betting[i]}")
 
-    def dqn_train_keras_rl(self, model_name):
-        """Implementation of kreras-rl deep q learing."""
+    def dqn_train(self, model_name):
+        """Implementation of Stable Baselines3 DQN training."""
         from agents.agent_consider_equity import Player as EquityPlayer
-        from agents.agent_keras_rl_dqn import Player as DQNPlayer
+        from agents.agent_stable_baseline3_dqn import Player as SB3Player
         from agents.agent_random import Player as RandomPlayer
 
         env_name = "neuron_poker-v0"
@@ -217,7 +235,6 @@ class SelfPlay:
         )
 
         np.random.seed(123)
-        env.seed(123)
         env.unwrapped.add_player(
             EquityPlayer(name="equity/50/70", min_call_equity=0.5, min_bet_equity=0.7)
         )
@@ -228,19 +245,19 @@ class SelfPlay:
         env.unwrapped.add_player(RandomPlayer())
         env.unwrapped.add_player(RandomPlayer())
         env.unwrapped.add_player(
-            PlayerShell(name="keras-rl", stack_size=self.stack)
-        )  # shell is used for callback to keras rl
+            PlayerShell(name="sb3-dqn", stack_size=self.stack)
+        )  # shell is used for callback to stable baselines3
 
-        env.reset()
+        env.reset(seed=123)
 
-        dqn = DQNPlayer()
-        dqn.initiate_agent(env)
-        dqn.train(env_name=model_name)
+        sb3_player = SB3Player(name="sb3-dqn")
+        sb3_player.initiate_agent(env)
+        sb3_player.train(env_name=model_name)
 
-    def dqn_play_keras_rl(self, model_name):
-        """Create 6 players, one of them a trained DQN"""
+    def dqn_play(self, model_name):
+        """Create 6 players, one of them a trained DQN using Stable Baselines3"""
         from agents.agent_consider_equity import Player as EquityPlayer
-        from agents.agent_keras_rl_dqn import Player as DQNPlayer
+        from agents.agent_stable_baseline3_dqn import Player as SB3Player
         from agents.agent_random import Player as RandomPlayer
 
         env_name = "neuron_poker-v0"
@@ -259,13 +276,15 @@ class SelfPlay:
         )
         self.env.unwrapped.add_player(RandomPlayer())
         self.env.unwrapped.add_player(
-            PlayerShell(name="keras-rl", stack_size=self.stack)
+            PlayerShell(name="sb3-dqn", stack_size=self.stack)
         )
 
         self.env.reset()
 
-        dqn = DQNPlayer(load_model=model_name, env=self.env)
-        dqn.play(nb_episodes=self.num_episodes, render=self.render)
+        sb3_player = SB3Player(name="sb3-dqn")
+        sb3_player.env = self.env
+        sb3_player.load(model_name)
+        sb3_player.play(nb_episodes=self.num_episodes, render=self.render)
 
     def dqn_train_custom_q1(self):
         """Create 6 players, 4 of them equity based, 2 of them random"""
@@ -275,16 +294,16 @@ class SelfPlay:
 
         env_name = "neuron_poker-v0"
         self.env = gym.make(env_name, initial_stacks=self.stack, render=self.render)
-        # self.env.unwrapped.add_player(EquityPlayer(name='equity/50/50', min_call_equity=.5, min_bet_equity=-.5))
-        # self.env.unwrapped.add_player(EquityPlayer(name='equity/50/80', min_call_equity=.8, min_bet_equity=-.8))
-        # self.env.unwrapped.add_player(EquityPlayer(name='equity/70/70', min_call_equity=.7, min_bet_equity=-.7))
         self.env.unwrapped.add_player(
             EquityPlayer(name="equity/20/30", min_call_equity=0.2, min_bet_equity=-0.3)
         )
-        # self.env.unwrapped.add_player(RandomPlayer())
         self.env.unwrapped.add_player(RandomPlayer())
         self.env.unwrapped.add_player(RandomPlayer())
-        self.env.unwrapped.add_player(Custom_Q1(name="Deep_Q1"))
+
+        # Add custom Q1 player with SB3
+        custom_player = Custom_Q1(name="Deep_Q1")
+        custom_player.initiate_agent(self.env)
+        self.env.unwrapped.add_player(custom_player)
 
         for _ in range(self.num_episodes):
             self.env.reset()

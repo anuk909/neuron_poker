@@ -35,13 +35,13 @@ def main_equity_improvement():
 
 
 def main_dqn_train():
-    """Train DQN agent"""
+    """Train DQN agent using Stable Baselines3"""
     sys.argv = ["main.py", "selfplay", "dqn_train"]
     command_line_parser()
 
 
 def main_dqn_play():
-    """Play with trained DQN agent"""
+    """Play with trained DQN agent using Stable Baselines3"""
     sys.argv = ["main.py", "selfplay", "dqn_play"]
     command_line_parser()
 
@@ -65,6 +65,6 @@ def main_equity_render():
 
 
 def main_dqn_train_cpp():
-    """Train DQN agent with C++ Monte Carlo"""
+    """Train DQN agent using Stable Baselines3 with C++ Monte Carlo"""
     sys.argv = ["main.py", "selfplay", "dqn_train", "--use_cpp_montecarlo"]
     command_line_parser()

@@ -52,7 +52,7 @@ Please add your model based agents here.
 -  ``agent_random.py``: an agent making random decisions
 -  ``agent_keypress.py``: an agent taking decision via keypress
 -  ``agent_consider_equity.py``: an agent considering equity information
--  ``agent_keras_rl_dqn.py``: Deep Q learning agent, using keras-rl for deep reinforcement learning
+-  ``agent_stable_baseline3_rl_dqn.py``: Deep Q learning agent, using stable_baseline3 for deep reinforcement learning
 -  ``agent_custom_q1.py``: Custom implementation of deep q learning
 
 Note that the observation property is a dictionary that contains all the information about the players and table that can be used to make a decision.
@@ -94,13 +94,13 @@ Agents
 - [x] Equity based strategy (i.e. call and bet above threshold)
 - [x] Equity based strategy with genetic algorithm, adjusting the treshold based on winning agent.
 - [x] C++ implementation of equity calculator to significantly speed up runs
-- [x] Agent based on reinforcement learning with experience replay (Deep Q learning, based on keras-rl)
+- [x] Agent based on reinforcement learning with experience replay (Deep Q learning, based on stable_baselines3)
 - [/] Custom agents (see above section for more details)
 
 Reinforcement learning: Deep Q agent
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``neuron_poker.agents.agent_dqn`` implements a deep q agent with help of keras-rl.
+``neuron_poker.agents.agent_dqn`` implements a deep q agent with help of stable_baselines3.
 A number of parameters can be se:
 
 - nb_max_start_steps = 20  # maximum of random actions at the beginning
@@ -140,7 +140,7 @@ As you can see, as a first step, the environment needs to be created. As a secon
 added to the table. As a third step the game is kicked off with a reset. Agents with autoplay set to True will automatically
 play, by having the action method called of their class. Alternatively you can use the PlayerShell class
 and the environment will require you call call the step function manually and loop over it. This may be helpful
-when using other packages which are designed to interface with Gymnasium, such as keras-rl.
+when using other packages which are designed to interface with Gymnasium, such as stable_baselines3.
 
 Adding a new model / agent
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
